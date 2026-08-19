@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>THAT SHOP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --pink: #ff7eb9;
+    --yellow: #ffe66d;
+    --white: #fff;
+    --dark: #333;
+}
+
+body {
+    margin: 0;
+    font-family: Arial;
+    background: var(--white);
+    color: var(--dark);
+}
+
+header {
+    background: linear-gradient(90deg, var(--pink), var(--yellow));
+    padding: 25px;
+    text-align: center;
+    color: var(--white);
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+nav {
+    background: var(--pink);
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+nav button {
+    background: transparent;
+    border: none;
+    color: var(--white);
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.screen {
+    display: none;
+    padding: 20px;
+    max-width: 900px;
+    margin: auto;
+}
+
+.active {
+    display: block;
+}
+
+input, button {
+    padding: 10px;
+    margin: 5px 0;
+}
+
+button {
+    background: var(--pink);
+    color: var(--white);
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.product-card {
+    border: 2px solid var(--pink);
+    padding: 15px;
+    border-radius: 10px;
+    margin: 10px 0;
+}
+
+.product-card img {
+    width: 100%;
+    border-radius: 10px;
+}
+</style>
+
+<script>
+// -----------------------------
+// DATABASE HELPERS
+// -----------------------------
+function save(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+}
+function load(key, fallback) {
+    return JSON.parse(localStorage.getItem(key)) || fallback;
+}
+
+// -----------------------------
+// CUSTOMER ACCOUNTS
+// -----------------------------
+let customers = load("customers", []);
+let currentUser = load("currentUser", null);
+
+function signup(email, password) {
+    if (customers.find(u => u.email === email)) return "Email exists";
+    customers.push({ email, password, cart: [], orders: [] });
+    save("customers", customers);
+    return "success";
+}
+
+function login(email, password) {
+    const user = customers.find(u => u.email === email && u.password === password);
+    if (!user) return "Invalid";
+    currentUser = user;
+    save("currentUser", currentUser);
+    return "success";
+}
+
+function logout() {
+    currentUser = null;
+    save("currentUser", null);
+}
+
+// -----------------------------
+// ADMIN ACCOUNT
+// -----------------------------
+const admin = { email: "brysonterry3@thatshop.com", password: "August2024#" };
+let adminLoggedIn = load("adminLoggedIn", false);
+
+function adminLogin(email, password) {
+    if (email === admin.email && password === admin.password) {
+        adminLoggedIn = true;
+        save("adminLoggedIn", true);
+        return "success";
+    }
+    return "Invalid";
+}
+
+function adminLogout() {
+    adminLoggedIn = false;
+    save("adminLoggedIn", false);
+}
+
+// -----------------------------
+// CATEGORIES
+// -----------------------------
+let categories = load("categories", ["Squishes", "Soaps"]);
+
+function addCategory(name) {
+    categories.push(name);
+    save("categories", categories);
+}
+
+function deleteCategory(name) {
+    categories = categories.filter(c => c !== name);
+    save("categories", categories);
+}
+
+// -----------------------------
+// PRODUCTS
+// -----------------------------
+let products = load("products", [
+    { id: 1, name: "Bear Squish", price: 6, stock: 10, category: "Squishes", img: "https://via.placeholder.com/300x200?text=Bear+Squish" },
+    { id: 2, name: "Star Squish", price: 5, stock: 12, category: "Squishes", img: "https://via.placeholder.com/300x200?text=Star+Squish" },
+    { id: 3, name: "Lavender Soap", price: 4, stock: 20, category: "Soaps", img: "https://via.placeholder.com/300x200?text=Lavender+Soap" }
+]);
+
+function addProduct(name, price, stock, category, img) {
+    products.push({ id: Date.now(), name, price, stock, category, img });
+    save("products", products);
+}
+
+function updateStock(id, newStock) {
+    const p = products.find(x => x.id === id);
+    if (p) {
+        p.stock = newStock;
+        save("products", products);
+    }
+}
+
+function deleteProduct(id) {
+    products = products.filter(p => p.id !== id);
+    save("products", products);
+}
+
+// -----------------------------
+// CART
+// -----------------------------
+function addToCart(id) {
+    if (!currentUser) return "login";
+    const p = products.find(x => x.id === id);
+    if (!p || p.stock <= 0) return "stock";
+    currentUser.cart.push(p);
+    save("currentUser", currentUser);
+    save("customers", customers);
+    return "ok";
+}
+
+function clearCart() {
+    currentUser.cart = [];
+    save("currentUser", currentUser);
+    save("customers", customers);
+}
+
+// -----------------------------
+// CHECKOUT
+// -----------------------------
+function checkout() {
+    if (!currentUser) return "login";
+    if (currentUser.cart.length === 0) return "empty";
+
+    currentUser.cart.forEach(item => {
+        const p = products.find(x => x.id === item.id);
+        if (p) p.stock -= 1;
+    });
+
+    save("products", products);
+
+    currentUser.orders.push({
+        id: Date.now(),
+        items: currentUser.cart,
+        date: new Date().toLocaleString()
+    });
+
+    save("currentUser", currentUser);
+    save("customers", customers);
+
+    clearCart();
+    return "ok";
+}
+
+// -----------------------------
+// SCREEN SWITCHER
+// -----------------------------
+function show(screen) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    document.getElementById(screen).classList.add("active");
+}
+</script>
+
+</head>
+<body>
+
+<header>THAT SHOP</header>
+
+<nav>
+    <button onclick="show('home')">Home</button>
+    <button onclick="show('products')">Products</button>
+    <button onclick="show('cart')">Cart</button>
+    <button onclick="show('login')">Login</button>
+    <button onclick="show('signup')">Sign Up</button>
+    <button onclick="show('adminLogin')">Admin</button>
+</nav>
+<!-- HOME SCREEN -->
+<div id="home" class="screen active">
+    <h2 style="color:var(--pink);">Welcome to THAT SHOP</h2>
+    <p>Your place for cute squishes and handmade soaps.</p>
+
+    <h3 style="color:var(--yellow);">Categories</h3>
+    <div id="homeCategories"></div>
+</div>
+
+<script>
+function loadHomeCategories() {
+    let html = "";
+    categories.forEach(c => {
+        html += `<div class="product-card">
+                    <h3>${c}</h3>
+                    <button onclick="show('products')">View Products</button>
+                 </div>`;
+    });
+    homeCategories.innerHTML = html;
+}
+loadHomeCategories();
+</script>
+
+
+<!-- PRODUCTS SCREEN -->
+<div id="products" class="screen">
+    <h2 style="color:var(--pink);">Products</h2>
+    <div id="productList"></div>
+</div>
+
+<script>
+function loadProducts() {
+    let html = "";
+    products.forEach(p => {
+        html += `
+        <div class="product-card">
+            <img src="${p.img}">
+            <h3>${p.name}</h3>
+            <p>$${p.price}</p>
+            <p>Stock: ${p.stock}</p>
+            <button onclick="viewProduct(${p.id})">View</button>
+            <button onclick="addToCartHandler(${p.id})">Add to Cart</button>
+        </div>`;
+    });
+    productList.innerHTML = html;
+}
+loadProducts();
+
+function addToCartHandler(id) {
+    const result = addToCart(id);
+    if (result === "login") {
+        alert("Please log in first");
+        show("login");
+    } else if (result === "stock") {
+        alert("Out of stock");
+    } else {
+        alert("Added to cart");
+    }
+}
+</script>
+
+
+<!-- PRODUCT VIEWER SCREEN -->
+<div id="productView" class="screen">
+    <h2 style="color:var(--pink);">Product Details</h2>
+    <div id="productViewContent"></div>
+    <button onclick="show('products')">Back</button>
+</div>
+
+<script>
+function viewProduct(id) {
+    const p = products.find(x => x.id === id);
+    productViewContent.innerHTML = `
+        <img src="${p.img}">
+        <h3>${p.name}</h3>
+        <p>$${p.price}</p>
+        <p>Stock: ${p.stock}</p>
+        <button onclick="addToCartHandler(${p.id})">Add to Cart</button>
+    `;
+    show("productView");
+}
+</script>
+
+
+<!-- CART SCREEN -->
+<div id="cart" class="screen">
+    <h2 style="color:var(--pink);">Your Cart</h2>
+    <div id="cartItems"></div>
+    <h3 id="cartTotal"></h3>
+    <button onclick="show('checkout')">Checkout</button>
+</div>
+
+<script>
+function loadCart() {
+    if (!currentUser) {
+        cartItems.innerHTML = "<p>Please log in first.</p>";
+        return;
+    }
+
+    let html = "";
+    let total = 0;
+
+    currentUser.cart.forEach(item => {
+        html += `
+            <div class="product-card">
+                <h3>${item.name}</h3>
+                <p>$${item.price}</p>
+            </div>
+        `;
+        total += item.price;
+    });
+
+    cartItems.innerHTML = html;
+    cartTotal.innerText = "Total: $" + total.toFixed(2);
+}
+</script>
+
+
+<!-- CHECKOUT SCREEN -->
+<div id="checkout" class="screen">
+    <h2 style="color:var(--pink);">Checkout</h2>
+    <p>Review your items and place your order.</p>
+
+    <div id="checkoutItems"></div>
+    <h3 id="checkoutTotal"></h3>
+
+    <button onclick="placeOrder()">Place Order</button>
+</div>
+
+<script>
+function loadCheckout() {
+    if (!currentUser) {
+        checkoutItems.innerHTML = "<p>Please log in first.</p>";
+        return;
+    }
+
+    let html = "";
+    let total = 0;
+
+    currentUser.cart.forEach(item => {
+        html += `
+            <div class="product-card">
+                <h3>${item.name}</h3>
+                <p>$${item.price}</p>
+            </div>
+        `;
+        total += item.price;
+    });
+
+    checkoutItems.innerHTML = html;
+    checkoutTotal.innerText = "Total: $" + total.toFixed(2);
+}
+
+function placeOrder() {
+    const result = checkout();
+    if (result === "ok") {
+        alert("Order placed! Thank you!");
+        show("home");
+    }
+}
+</script>
+<!-- LOGIN SCREEN -->
+<div id="login" class="screen">
+    <h2 style="color:var(--pink);">Customer Login</h2>
+
+    <input id="loginEmail" placeholder="Email"><br>
+    <input id="loginPassword" placeholder="Password" type="password"><br>
+    <button onclick="customerLogin()">Login</button>
+
+    <p id="loginMsg"></p>
+</div>
+
+<script>
+function customerLogin() {
+    const email = loginEmail.value;
+    const password = loginPassword.value;
+
+    const result = login(email, password);
+
+    if (result === "success") {
+        loginMsg.innerText = "Logged in!";
+        show("home");
+    } else {
+        loginMsg.innerText = "Invalid email or password";
+    }
+}
+</script>
+
+
+<!-- SIGNUP SCREEN -->
+<div id="signup" class="screen">
+    <h2 style="color:var(--pink);">Create Account</h2>
+
+    <input id="signupEmail" placeholder="Email"><br>
+    <input id="signupPassword" placeholder="Password" type="password"><br>
+    <button onclick="customerSignup()">Sign Up</button>
+
+    <p id="signupMsg"></p>
+</div>
+
+<script>
+function customerSignup() {
+    const email = signupEmail.value;
+    const password = signupPassword.value;
+
+    const result = signup(email, password);
+
+    if (result === "success") {
+        signupMsg.innerText = "Account created!";
+        show("login");
+    } else {
+        signupMsg.innerText = "Email already exists";
+    }
+}
+</script>
+
+
+<!-- ADMIN LOGIN SCREEN -->
+<div id="adminLogin" class="screen">
+    <h2 style="color:var(--pink);">Admin Login</h2>
+
+    <input id="adminEmail" placeholder="Admin Email"><br>
+    <input id="adminPassword" placeholder="Password" type="password"><br>
+    <button onclick="doAdminLogin()">Login</button>
+
+    <p id="adminLoginMsg"></p>
+</div>
+
+<script>
+function doAdminLogin() {
+    const email = adminEmail.value;
+    const password = adminPassword.value;
+
+    const result = adminLogin(email, password);
+
+    if (result === "success") {
+        adminLoginMsg.innerText = "Admin logged in!";
+        show("adminDashboard");
+    } else {
+        adminLoginMsg.innerText = "Invalid admin login";
+    }
+}
+</script>
+
+
+<!-- ADMIN DASHBOARD -->
+<div id="adminDashboard" class="screen">
+    <h2 style="color:var(--pink);">Admin Dashboard</h2>
+
+    <button onclick="show('adminProducts')">Manage Products</button>
+    <button onclick="show('adminCategories')">Manage Categories</button>
+    <button onclick="adminLogout(); show('adminLogin')">Logout</button>
+</div>
+
+
+<!-- ADMIN PRODUCT MANAGER -->
+<div id="adminProducts" class="screen">
+    <h2 style="color:var(--pink);">Product Manager</h2>
+
+    <h3>Add Product</h3>
+    <input id="newProdName" placeholder="Name"><br>
+    <input id="newProdPrice" placeholder="Price"><br>
+    <input id="newProdStock" placeholder="Stock"><br>
+    <input id="newProdCategory" placeholder="Category"><br>
+    <input id="newProdImg" placeholder="Image URL"><br>
+    <button onclick="addNewProduct()">Add Product</button>
+
+    <h3>Inventory</h3>
+    <div id="adminProductList"></div>
+
+    <button onclick="show('adminDashboard')">Back</button>
+</div>
+
+<script>
+function addNewProduct() {
+    addProduct(
+        newProdName.value,
+        Number(newProdPrice.value),
+        Number(newProdStock.value),
+        newProdCategory.value,
+        newProdImg.value
+    );
+
+    alert("Product added!");
+    loadAdminProducts();
+}
+
+function loadAdminProducts() {
+    let html = "";
+    products.forEach(p => {
+        html += `
+            <div class="product-card">
+                <h3>${p.name}</h3>
+                <p>$${p.price}</p>
+                <p>Stock: ${p.stock}</p>
+                <button onclick="updateStock(${p.id}, ${p.stock + 1})">Increase Stock</button>
+                <button onclick="updateStock(${p.id}, ${p.stock - 1})">Decrease Stock</button>
+                <button onclick="deleteProduct(${p.id}); loadAdminProducts()">Delete</button>
+            </div>
+        `;
+    });
+    adminProductList.innerHTML = html;
+}
+</script>
+
+
+<!-- ADMIN CATEGORY MANAGER -->
+<div id="adminCategories" class="screen">
+    <h2 style="color:var(--pink);">Category Manager</h2>
+
+    <h3>Add Category</h3>
+    <input id="newCategory" placeholder="Category Name"><br>
+    <button onclick="addNewCategory()">Add Category</button>
+
+    <h3>Existing Categories</h3>
+    <div id="adminCategoryList"></div>
+
+    <button onclick="show('adminDashboard')">Back</button>
+</div>
+
+<script>
+function addNewCategory() {
+    addCategory(newCategory.value);
+    loadAdminCategories();
+}
+
+function loadAdminCategories() {
+    let html = "";
+    categories.forEach(c => {
+        html += `
+            <div class="product-card">
+                <h3>${c}</h3>
+                <button onclick="deleteCategory('${c}'); loadAdminCategories()">Delete</button>
+            </div>
+        `;
+    });
+    adminCategoryList.innerHTML = html;
+}
+</script>
+<script>
+// -----------------------------
+// AUTO LOADERS FOR EACH SCREEN
+// -----------------------------
+function updateScreens() {
+    loadProducts();
+    loadCart();
+    loadCheckout();
+    loadAdminProducts();
+    loadAdminCategories();
+}
+
+// When switching screens, auto-load content
+document.querySelectorAll("nav button").forEach(btn => {
+    btn.addEventListener("click", () => {
+        updateScreens();
+    });
+});
+
+// Also load when admin dashboard buttons are clicked
+document.addEventListener("click", (e) => {
+    if (e.target.tagName === "BUTTON") {
+        updateScreens();
+    }
+});
+</script>
+
+</body>
+</html>
